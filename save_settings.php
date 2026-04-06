@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
@@ -28,8 +28,11 @@ function safe_profile_id(string $profileId): bool {
 
 function normalize_provider(string $provider): string {
     $provider = strtolower(trim($provider));
-    if ($provider === 'openai') {
-        $provider = 'chatgpt';
+    if ($provider === '2') {
+        return 'gemini';
+    }
+    if ($provider === '1' || $provider === 'openai') {
+        return 'chatgpt';
     }
     return ($provider === 'gemini') ? 'gemini' : 'chatgpt';
 }

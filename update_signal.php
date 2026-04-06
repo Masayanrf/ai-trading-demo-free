@@ -10,7 +10,7 @@ header('Content-Type: text/plain; charset=UTF-8');
 $CHATGPT_ENDPOINT = 'https://api.openai.com/v1/responses';
 $CHATGPT_MODEL    = 'gpt-5.4-nano';
 $GEMINI_ENDPOINT  = 'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent';
-$GEMINI_MODEL     = 'gemini-2.5-flash';
+$GEMINI_MODEL     = 'gemini-2.5-flash-lite';
 
 function respond_and_exit(array $lines, int $httpCode = 200): void {
     http_response_code($httpCode);
@@ -33,8 +33,11 @@ function safe_profile_id(string $profileId): bool {
 
 function normalize_provider(string $provider): string {
     $provider = strtolower(trim($provider));
-    if ($provider === 'openai') {
-        $provider = 'chatgpt';
+    if ($provider === '2') {
+        return 'gemini';
+    }
+    if ($provider === '1' || $provider === 'openai') {
+        return 'chatgpt';
     }
     return ($provider === 'gemini') ? 'gemini' : 'chatgpt';
 }
@@ -193,7 +196,7 @@ function call_gemini_generate_content(string $apiKey, string $instructions, stri
         ],
         'generationConfig' => [
             'temperature'     => 0.1,
-            'maxOutputTokens' => 50,
+            'maxOutputTokens' => 200,
         ],
     ];
 
@@ -233,8 +236,12 @@ function call_gemini_generate_content(string $apiKey, string $instructions, stri
     }
 
     $text = '';
+    $finishReason = '';
     if (!empty($data['candidates']) && is_array($data['candidates'])) {
         foreach ($data['candidates'] as $candidate) {
+            if ($finishReason === '' && !empty($candidate['finishReason']) && is_string($candidate['finishReason'])) {
+                $finishReason = strtolower($candidate['finishReason']);
+            }
             if (empty($candidate['content']['parts']) || !is_array($candidate['content']['parts'])) {
                 continue;
             }
@@ -247,7 +254,25 @@ function call_gemini_generate_content(string $apiKey, string $instructions, stri
     }
 
     $text = trim($text);
-    return ['ok' => ($text !== ''), 'text' => $text, 'error' => ($text !== '' ? '' : 'gemini_empty_output')];
+    if ($text !== '') {
+        return ['ok' => true, 'text' => $text, 'error' => ''];
+    }
+
+    $blockReason = '';
+    if (!empty($data['promptFeedback']['blockReason']) && is_string($data['promptFeedback']['blockReason'])) {
+        $blockReason = strtolower($data['promptFeedback']['blockReason']);
+    }
+    if ($blockReason !== '') {
+        return ['ok' => false, 'text' => '', 'error' => 'gemini_blocked:' . $blockReason];
+    }
+    if ($finishReason !== '') {
+        return ['ok' => false, 'text' => '', 'error' => 'gemini_finish_reason:' . $finishReason];
+    }
+    if (empty($data['candidates']) || !is_array($data['candidates'])) {
+        return ['ok' => false, 'text' => '', 'error' => 'gemini_no_candidates'];
+    }
+
+    return ['ok' => false, 'text' => '', 'error' => 'gemini_empty_output'];
 }
 
 function call_ai_response(string $provider, string $apiKey, string $instructions, string $input): array {
