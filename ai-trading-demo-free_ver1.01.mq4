@@ -4,9 +4,10 @@
 #property description "ai-trading-demo-free for MT4"
 
 extern string ProfileID          = "mt4demo";
-extern string AIProvider         = "1"; // 1.chatgpt / 2.gemini
+extern string AIProvider         = "1"; // 1.ChatGPT / 2.Gemini / 3.Xai
 extern string ChatGPTApiKey      = "";
 extern string GeminiApiKey       = "";
+extern string XaiApiKey          = "";
 extern string RSSFeedURL         = "https://fx.reform-network.net/feed/";
 extern string PromptText         = "If the RSS feed content can be read, please return 1 for a long signal.";
 extern string SaveSettingsURL    = "https://example.com/ai-trading-demo-free/save_settings.php";
@@ -46,6 +47,7 @@ string SelectedApiKey(){
    string provider = AIProvider;
    StringToLower(provider);
    if(provider == "2") return GeminiApiKey;
+   if(provider == "3") return XaiApiKey;
    return ChatGPTApiKey;
 }
 

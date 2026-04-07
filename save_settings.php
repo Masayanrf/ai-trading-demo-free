@@ -31,10 +31,16 @@ function normalize_provider(string $provider): string {
     if ($provider === '2') {
         return 'gemini';
     }
+    if ($provider === '3' || $provider === 'xai') {
+        return 'xai';
+    }
     if ($provider === '1' || $provider === 'openai') {
         return 'chatgpt';
     }
-    return ($provider === 'gemini') ? 'gemini' : 'chatgpt';
+    if ($provider === 'gemini') {
+        return 'gemini';
+    }
+    return ($provider === 'xai') ? 'xai' : 'chatgpt';
 }
 
 function normalize_url(string $url): string {

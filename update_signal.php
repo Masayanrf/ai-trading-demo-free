@@ -11,7 +11,8 @@ $CHATGPT_ENDPOINT = 'https://api.openai.com/v1/responses';
 $CHATGPT_MODEL    = 'gpt-5.4-nano';
 $GEMINI_ENDPOINT  = 'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent';
 $GEMINI_MODEL     = 'gemini-2.5-flash-lite';
-
+$XAI_ENDPOINT     = 'https://api.x.ai/v1/responses';
+$XAI_MODEL        = 'grok-4-1-fast-reasoning';
 function respond_and_exit(array $lines, int $httpCode = 200): void {
     http_response_code($httpCode);
     foreach ($lines as $line) {
@@ -36,10 +37,16 @@ function normalize_provider(string $provider): string {
     if ($provider === '2') {
         return 'gemini';
     }
+    if ($provider === '3' || $provider === 'xai') {
+        return 'xai';
+    }
     if ($provider === '1' || $provider === 'openai') {
         return 'chatgpt';
     }
-    return ($provider === 'gemini') ? 'gemini' : 'chatgpt';
+    if ($provider === 'gemini') {
+        return 'gemini';
+    }
+    return ($provider === 'xai') ? 'xai' : 'chatgpt';
 }
 
 function ensure_dir(string $dir): void {
@@ -275,9 +282,85 @@ function call_gemini_generate_content(string $apiKey, string $instructions, stri
     return ['ok' => false, 'text' => '', 'error' => 'gemini_empty_output'];
 }
 
+function call_xai_responses(string $apiKey, string $instructions, string $input): array {
+    global $XAI_ENDPOINT, $XAI_MODEL;
+
+    $payload = [
+        'model' => $XAI_MODEL,
+        'store' => false,
+        'input' => [
+            [
+                'role' => 'system',
+                'content' => $instructions,
+            ],
+            [
+                'role' => 'user',
+                'content' => $input,
+            ],
+        ],
+    ];
+
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        return ['ok' => false, 'text' => '', 'error' => 'json_encode_failed'];
+    }
+
+    $ch = curl_init($XAI_ENDPOINT);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT        => 120,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey,
+        ],
+        CURLOPT_POSTFIELDS     => $json,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+    ]);
+
+    $raw  = curl_exec($ch);
+    $err  = curl_error($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($raw === false || $code < 200 || $code >= 300) {
+        return ['ok' => false, 'text' => '', 'error' => 'xai_http_error:' . $code . ':' . $err];
+    }
+
+    $data = json_decode($raw, true);
+    if (!is_array($data)) {
+        return ['ok' => false, 'text' => '', 'error' => 'xai_invalid_json'];
+    }
+
+    $text = '';
+    if (!empty($data['output_text']) && is_string($data['output_text'])) {
+        $text = trim($data['output_text']);
+    }
+    if ($text === '' && !empty($data['output']) && is_array($data['output'])) {
+        foreach ($data['output'] as $out) {
+            if (empty($out['content']) || !is_array($out['content'])) {
+                continue;
+            }
+            foreach ($out['content'] as $content) {
+                if (isset($content['text']) && is_string($content['text'])) {
+                    $text .= $content['text'] . "\n";
+                }
+            }
+        }
+        $text = trim($text);
+    }
+
+    return ['ok' => ($text !== ''), 'text' => $text, 'error' => ($text !== '' ? '' : 'xai_empty_output')];
+}
+
 function call_ai_response(string $provider, string $apiKey, string $instructions, string $input): array {
     if ($provider === 'gemini') {
         return call_gemini_generate_content($apiKey, $instructions, $input);
+    }
+    if ($provider === 'xai') {
+        return call_xai_responses($apiKey, $instructions, $input);
     }
     return call_chatgpt_responses($apiKey, $instructions, $input);
 }

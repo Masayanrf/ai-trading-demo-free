@@ -6,9 +6,10 @@
 #include <Trade/Trade.mqh>
 
 input string ProfileID          = "mt5demo";
-input string AIProvider         = "1"; // 1.chatgpt / 2.gemini
+input string AIProvider         = "1"; // 1.ChatGPT / 2.Gemini / 3.Xai
 input string ChatGPTApiKey      = "";
 input string GeminiApiKey       = "";
+input string XaiApiKey          = "";
 input string RSSFeedURL         = "https://fx.reform-network.net/feed/";
 input string PromptText         = "If the RSS feed content can be read, please return 1 for a long signal.";
 input string SaveSettingsURL    = "https://example.com/ai-trading-demo-free/save_settings.php";
@@ -49,6 +50,7 @@ string SelectedApiKey(){
    string provider = AIProvider;
    StringToLower(provider);
    if(provider == "2") return GeminiApiKey;
+   if(provider == "3") return XaiApiKey;
    return ChatGPTApiKey;
 }
 
